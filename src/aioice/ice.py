@@ -707,7 +707,7 @@ class Connection:
 
         # if we expect more candidates, keep going
         if not self._remote_candidates_end:
-            print("check list done {}".format(self._check_list_done))
+            #print("check list done {}".format(self._check_list_done))
             return not self._check_list_done
 
         return False
