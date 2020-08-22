@@ -106,6 +106,7 @@ def validate_remote_candidate(candidate: Candidate) -> Candidate:
     mDNS candidates are not supported yet.
     """
     if candidate.type not in ["host", "relay", "srflx"]:
+        print("Invalid candidate {}".format(candidate.type))
         raise ValueError('Unexpected candidate type "%s"' % candidate.type)
     #ipaddress.ip_address(candidate.host)
     return candidate
@@ -692,7 +693,6 @@ class Connection:
     def check_periodic(self) -> bool:
         # find the highest-priority pair that is in the waiting state
         for pair in self._check_list:
-            print("Print {} is waiting".format(pair))
             if pair.state == CandidatePair.State.WAITING:
                 print("Print {} is waiting".format(pair))
                 pair.handle = asyncio.ensure_future(self.check_start(pair))
@@ -707,7 +707,7 @@ class Connection:
 
         # if we expect more candidates, keep going
         if not self._remote_candidates_end:
-            print("check list done".format(self._check_list_done))
+            print("check list done {}".format(self._check_list_done))
             return not self._check_list_done
 
         return False
@@ -727,7 +727,7 @@ class Connection:
                 integrity_key=self.remote_password.encode("utf8"),
             )
         except stun.TransactionError as exc:
-            print("failed {}".format(pair) )
+            print("failed {} {}".format(pair, exc) )
             # 7.1.3.1. Failure Cases
             if (
                     exc.response
