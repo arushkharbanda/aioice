@@ -5,7 +5,6 @@ import logging
 import random
 import secrets
 import socket
-import warnings
 from itertools import count
 from typing import Dict, List, Optional, Set, Text, Tuple, Union, cast
 
@@ -28,7 +27,7 @@ protocol_id = count()
 
 
 def candidate_pair_priority(
-    local: Candidate, remote: Candidate, ice_controlling: bool
+        local: Candidate, remote: Candidate, ice_controlling: bool
 ) -> int:
     """
     See RFC 5245 - 5.7.2. Computing Pair Priority and Ordering Pairs
@@ -55,7 +54,7 @@ def get_host_addresses(use_ipv4: bool, use_ipv6: bool) -> List[str]:
 
 
 async def server_reflexive_candidate(
-    protocol, stun_server: Tuple[str, int]
+        protocol, stun_server: Tuple[str, int]
 ) -> Candidate:
     """
     Query STUN server to obtain a server-reflexive candidate.
@@ -179,8 +178,8 @@ class StunProtocol(asyncio.DatagramProtocol):
             return
 
         if (
-            message.message_class == stun.Class.RESPONSE
-            or message.message_class == stun.Class.ERROR
+                message.message_class == stun.Class.RESPONSE
+                or message.message_class == stun.Class.ERROR
         ) and message.transaction_id in self.transactions:
             transaction = self.transactions[message.transaction_id]
             transaction.response_received(message, addr)
@@ -197,11 +196,11 @@ class StunProtocol(asyncio.DatagramProtocol):
         await self.__closed
 
     async def request(
-        self,
-        request: stun.Message,
-        addr: Tuple[str, int],
-        integrity_key: Optional[bytes] = None,
-        retransmissions=None,
+            self,
+            request: stun.Message,
+            addr: Tuple[str, int],
+            integrity_key: Optional[bytes] = None,
+            retransmissions=None,
     ) -> Tuple[stun.Message, Tuple[str, int]]:
         """
         Execute a STUN transaction and return the response.
@@ -255,17 +254,17 @@ class Connection:
     """
 
     def __init__(
-        self,
-        ice_controlling: bool,
-        components: int = 1,
-        stun_server: Optional[Tuple[str, int]] = None,
-        turn_server: Optional[Tuple[str, int]] = None,
-        turn_username: Optional[str] = None,
-        turn_password: Optional[str] = None,
-        turn_ssl: bool = False,
-        turn_transport: str = "udp",
-        use_ipv4: bool = True,
-        use_ipv6: bool = True,
+            self,
+            ice_controlling: bool,
+            components: int = 1,
+            stun_server: Optional[Tuple[str, int]] = None,
+            turn_server: Optional[Tuple[str, int]] = None,
+            turn_username: Optional[str] = None,
+            turn_password: Optional[str] = None,
+            turn_ssl: bool = False,
+            turn_transport: str = "udp",
+            use_ipv4: bool = True,
+            use_ipv6: bool = True,
     ) -> None:
         self.ice_controlling = ice_controlling
         #: Local username, automatically set to a random value.
@@ -319,25 +318,32 @@ class Connection:
     @property
     def remote_candidates(self) -> List[Candidate]:
         """
-        Remote candidates, which you need to populate using
-        :meth:`add_remote_candidate`.
+        Remote candidates, which you need to set.
+
+        Assigning this attribute will automatically signal end-of-candidates.
+        If you will be adding more remote candidates in the future, use the
+        :meth:`add_remote_candidate` method instead.
         """
         return self._remote_candidates[:]
 
     @remote_candidates.setter
     def remote_candidates(self, value: List[Candidate]) -> None:
-        warnings.warn(
-            "Assigning Connection.remote_candidates is deprecated, use add_remote_candidate",
-            category=DeprecationWarning,
-        )
         if self._remote_candidates_end:
             raise ValueError("Cannot set remote candidates after end-of-candidates.")
 
-        # replace remote candidates then signal end-of-candidates
+        # validate the remote candidates
         self._remote_candidates = []
         for remote_candidate in value:
-            self.add_remote_candidate(remote_candidate)
-        self.add_remote_candidate(None)
+            try:
+                print("validate_remote_candidate")
+                validate_remote_candidate(remote_candidate)
+            except ValueError:
+                continue
+            self._remote_candidates.append(remote_candidate)
+
+        # end-of-candidates
+        self._prune_components()
+        self._remote_candidates_end = True
 
     def add_remote_candidate(self, remote_candidate: Candidate) -> None:
         """
@@ -358,22 +364,22 @@ class Connection:
 
         # validate the remote candidate
         try:
+            print("validate_remote_candidate")
             validate_remote_candidate(remote_candidate)
-        except ValueError as e:
-            self.__log_info(f"Candidate not valid: {e}")
+        except ValueError:
             return
         self._remote_candidates.append(remote_candidate)
 
         # pair the remote candidate
         for protocol in self._protocols:
+            '''
+            if protocol.local_candidate.can_pair_with(
+                remote_candidate
+            ) and not self._find_pair(protocol, remote_candidate):
+            '''
             if not self._find_pair(protocol, remote_candidate):
-
-                '''
-                if protocol.local_candidate.can_pair_with(
-                    remote_candidate
-                ) and not self._find_pair(protocol, remote_candidate):
-                '''
                 pair = CandidatePair(protocol, remote_candidate)
+                print("Pair found {}".format(pair))
                 self._check_list.append(pair)
         self.sort_check_list()
 
@@ -538,7 +544,7 @@ class Connection:
             raise ConnectionError("Cannot send data, not connected")
 
     def set_selected_pair(
-        self, component: int, local_foundation: str, remote_foundation: str
+            self, component: int, local_foundation: str, remote_foundation: str
     ) -> None:
         """
         Force the selected candidate pair.
@@ -550,8 +556,8 @@ class Connection:
         protocol = None
         for p in self._protocols:
             if (
-                p.local_candidate.component == component
-                and p.local_candidate.foundation == local_foundation
+                    p.local_candidate.component == component
+                    and p.local_candidate.foundation == local_foundation
             ):
                 protocol = p
                 break
@@ -614,8 +620,8 @@ class Connection:
             # 7.1.3.2.3.  Updating Pair States
             for p in self._check_list:
                 if (
-                    p.local_candidate.foundation == pair.local_candidate.foundation
-                    and p.state == CandidatePair.State.FROZEN
+                        p.local_candidate.foundation == pair.local_candidate.foundation
+                        and p.state == CandidatePair.State.FROZEN
                 ):
                     self.check_state(p, CandidatePair.State.WAITING)
 
@@ -637,7 +643,7 @@ class Connection:
             self._check_list_done = True
 
     def check_incoming(
-        self, message: stun.Message, addr: Tuple[str, int], protocol: StunProtocol
+            self, message: stun.Message, addr: Tuple[str, int], protocol: StunProtocol
     ) -> None:
         """
         Handle a succesful incoming check.
@@ -721,8 +727,8 @@ class Connection:
         except stun.TransactionError as exc:
             # 7.1.3.1. Failure Cases
             if (
-                exc.response
-                and exc.response.attributes.get("ERROR-CODE", (None, None))[0] == 487
+                    exc.response
+                    and exc.response.attributes.get("ERROR-CODE", (None, None))[0] == 487
             ):
                 if "ICE-CONTROLLING" in request.attributes:
                     self.switch_role(ice_controlling=False)
@@ -773,7 +779,7 @@ class Connection:
         pair.state = state
 
     def _find_pair(
-        self, protocol: StunProtocol, remote_candidate: Candidate
+            self, protocol: StunProtocol, remote_candidate: Candidate
     ) -> Optional[CandidatePair]:
         """
         Find a candidate pair in the check list.
@@ -784,7 +790,7 @@ class Connection:
         return None
 
     async def get_component_candidates(
-        self, component: int, addresses: List[str], timeout: int = 5
+            self, component: int, addresses: List[str], timeout: int = 5
     ) -> List[Candidate]:
         candidates = []
 
@@ -904,11 +910,11 @@ class Connection:
         self._queue.put_nowait((data, component))
 
     def request_received(
-        self,
-        message: stun.Message,
-        addr: Tuple[str, int],
-        protocol: StunProtocol,
-        raw_data: bytes,
+            self,
+            message: stun.Message,
+            addr: Tuple[str, int],
+            protocol: StunProtocol,
+            raw_data: bytes,
     ) -> None:
         if message.message_method != stun.Method.BINDING:
             self.respond_error(message, addr, protocol, (400, "Bad Request"))
@@ -958,11 +964,11 @@ class Connection:
             self.check_incoming(message, addr, protocol)
 
     def respond_error(
-        self,
-        request: stun.Message,
-        addr: Tuple[str, int],
-        protocol: StunProtocol,
-        error_code: Tuple[int, str],
+            self,
+            request: stun.Message,
+            addr: Tuple[str, int],
+            protocol: StunProtocol,
+            error_code: Tuple[int, str],
     ) -> None:
         response = stun.Message(
             message_method=request.message_method,
@@ -975,6 +981,7 @@ class Connection:
         protocol.send_stun(response, addr)
 
     def sort_check_list(self) -> None:
+        print("sort_check_list")
         sort_candidate_pairs(self._check_list, self.ice_controlling)
 
     def switch_role(self, ice_controlling: bool) -> None:
@@ -1000,9 +1007,9 @@ class Connection:
         seen_foundations = set(first_pair.local_candidate.foundation)
         for pair in self._check_list:
             if (
-                pair.component == first_pair.component
-                and pair.local_candidate.foundation not in seen_foundations
-                and pair.state == CandidatePair.State.FROZEN
+                    pair.component == first_pair.component
+                    and pair.local_candidate.foundation not in seen_foundations
+                    and pair.state == CandidatePair.State.FROZEN
             ):
                 self.check_state(pair, CandidatePair.State.WAITING)
                 seen_foundations.add(pair.local_candidate.foundation)
