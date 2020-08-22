@@ -335,7 +335,6 @@ class Connection:
         self._remote_candidates = []
         for remote_candidate in value:
             try:
-                print("validate_remote_candidate")
                 validate_remote_candidate(remote_candidate)
             except ValueError:
                 continue
@@ -379,7 +378,6 @@ class Connection:
             '''
             if not self._find_pair(protocol, remote_candidate):
                 pair = CandidatePair(protocol, remote_candidate)
-                print("Pair found {}".format(pair))
                 self._check_list.append(pair)
         self.sort_check_list()
 
@@ -694,18 +692,22 @@ class Connection:
     def check_periodic(self) -> bool:
         # find the highest-priority pair that is in the waiting state
         for pair in self._check_list:
+            print("Print {} is waiting".format(pair))
             if pair.state == CandidatePair.State.WAITING:
+                print("Print {} is waiting".format(pair))
                 pair.handle = asyncio.ensure_future(self.check_start(pair))
                 return True
 
         # find the highest-priority pair that is in the frozen state
         for pair in self._check_list:
             if pair.state == CandidatePair.State.FROZEN:
+                print("Print {} is frozen".format(pair))
                 pair.handle = asyncio.ensure_future(self.check_start(pair))
                 return True
 
         # if we expect more candidates, keep going
         if not self._remote_candidates_end:
+            print("check list done".format(self._check_list_done))
             return not self._check_list_done
 
         return False
@@ -715,7 +717,7 @@ class Connection:
         Starts a check.
         """
         self.check_state(pair, CandidatePair.State.IN_PROGRESS)
-
+        print("checking {}".format(pair) )
         nominate = self.ice_controlling and not self.remote_is_lite
         request = self.build_request(pair, nominate=nominate)
         try:
@@ -725,6 +727,7 @@ class Connection:
                 integrity_key=self.remote_password.encode("utf8"),
             )
         except stun.TransactionError as exc:
+            print("failed {}".format(pair) )
             # 7.1.3.1. Failure Cases
             if (
                     exc.response
@@ -981,7 +984,6 @@ class Connection:
         protocol.send_stun(response, addr)
 
     def sort_check_list(self) -> None:
-        print("sort_check_list")
         sort_candidate_pairs(self._check_list, self.ice_controlling)
 
     def switch_role(self, ice_controlling: bool) -> None:
